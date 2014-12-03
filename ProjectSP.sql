@@ -1283,7 +1283,10 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				insert into PurchaseOrder(PurchaseOrderDate, SupplierID)
+					values (@PurchaseOrderDate, @SupplierID)
+				SELECT @PurchaseOrderID = SCOPE_IDENTITY()
+			set @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1294,7 +1297,6 @@ BEGIN
 	RETURN @Return
 END
 GO
-
 
 CREATE PROCEDURE AddPurchaseOrderDetail
 /*
@@ -1316,7 +1318,13 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				insert into PurchaseOrderDetail(PurchaseOrderID, ProductID, Quantity)
+					values (@PurchaseOrderID, @ProductID, @Quantity)
+					SELECT @PurchaseOrderDetailID from PurchaseOrderDetail
+						inner join PurchaseOrder
+						on PurchaseOrder.PurchaseOrderID = PurchaseOrderDetail.PurchaseOrderID
+					SELECT @PurchaseOrderDetailID = SCOPE_IDENTITY()
+			set @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1341,11 +1349,19 @@ Dataset Returned		No
 AS
 BEGIN
 	SET NOCOUNT ON;
-
+	SET TRANSACTION ISOLATION LEVEL SERIALIZABLE
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				UPDATE Product
+					Set Product.QuantityOnHand = Product.QuantityOnHand - PurchaseOrderDetail.Quantity
+					From Product
+					inner join PurchaseOrderDetail
+					on Product.ProductID = PurchaseOrderDetail.ProductID
+					inner join PurchaseOrder
+					on PurchaseOrderDetail.PurchaseOrderID = PurchaseOrderID.PurchaseOrderID
+					Where (Product.ProductID = PurchaseOrderDetail.ProductID) and (PurchaseOrder.PurchaseOrderID = @PurchaseOrderID)
+				SET @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1376,7 +1392,10 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				update PurhcaseOrder
+				set PurchaseOrderID = @PurchaseOrderID, PurchaseOrderDate = @PurchaseOrderDate 
+				Where PurchaseOrderID = @PurchaseOrderID
+				Set @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1406,8 +1425,15 @@ BEGIN
 
 	declare @Return int = 0
 	BEGIN TRY
+
 			BEGIN TRAN
-				
+				update PurchaseOrderDetail
+				set @ProductID = @ProductID, Quantity = @Quantity 
+				From PurchaseOrderDetail
+					inner join PurchaseOrder
+                        on PurchaseOrder.PurchaseOrderID = PurchaseOrderDetail.PurchaseOrderID
+				Where PurchaseOrderDetailID = @PurchaseOrderDetailID
+			Set @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1437,7 +1463,13 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				declare @count int = 0
+				select @count = count(PurchaseOrderID) from PurchaseOrder where PurchaseOrderID = @PurchaseOrderID
+				IF @count = 0
+				BEGIN
+					delete from PurchaseOrder where PurchaseOrderID = @PurchaseOrderID;
+				END
+				SET @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1468,7 +1500,9 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+                SELECT @SupplierID = SupplierID, @PurchaseOrderDate = PurchaseOrderDate
+                FROM PurchaseOrder WHERE PurchaseOrderID = @PurchaseOrderID
+                SET @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1500,7 +1534,9 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+                SELECT @ProductID = ProductID, @Quantity = Quantity
+                FROM PurchaseOrderDetail WHERE PurchaseOrderDetailID = @PurchaseOrderDetailID
+                SET @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -1537,9 +1573,23 @@ BEGIN
 
 	declare @Return int = 0
 	BEGIN TRY
-			BEGIN TRAN
-				
-			COMMIT TRAN
+		BEGIN TRAN
+                SELECT PurchaseOrder.PurchaseOrderID, PurchaseOrderDate, PaymentAmount, (Product.Price * PurchaseOrderDetail.Quantity) as PurchaseOrderAmount, 
+						((Product.Price * PurchaseOrderDetail.Quantity) - PaymentAmount) as AmountOwing from PurchaseOrder
+					Inner join PurchaseOrderDetail 
+						on PurchaseOrderDetail.PurchaseOrderID = PurchaseOrder.PurchaseOrderID
+					Inner join PurchaseOrderPayment
+						on PurchaseOrderPayment.PurchaseOrderID = PurchaseOrder.PurchaseOrderID
+					Inner join Product
+						on Product.ProductID = PurchaseOrderDetail.ProductID
+                Inner join Supplier
+                    on Supplier.SupplierID = PurchaseOrder.SupplierID
+                    SELECT CONCAT(FirstName, ' ', LastName) AS Supplier
+				FROM Supplier
+                WHERE (@SearchPurchaseOrderID is NULL or @SearchPurchaseOrderID like '%') and 
+                (@SearchSupplierID is NULL or SupplierID like '%')
+                SET @Return = 0
+COMMIT TRAN
 		END TRY
 		BEGIN CATCH
 			ROLLBACK
@@ -1575,8 +1625,23 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
-			COMMIT TRAN
+		
+			SELECT	PurchaseOrder.PurchaseOrderID,
+					PurchaseOrder.PurchaseOrderDate,
+					CONCAT(FirstName, ' ', LastName) AS Supplier,
+					SUM(Product.Price * PurchaseOrderDetail.Quantity) As PurchaseOrderAmount,
+					PaymentAmount,
+					SUM(Product.Price * PurchaseOrderDetail.Quantity)-PaymentAmount AS AmountOwing 				
+			FROM Invoice
+				LEFT JOIN Supplier ON Supplier.SupplierID = PurchaseOrder.SupplierID
+				LEFT JOIN PurchaseOrderDetail on PurchaseOrder.PurchaseOrderID = PurchaseOrderDetail.PurchaseOrderID
+				LEFT JOIN Product on PurchaseOrderDetail.ProductID = Product.ProductID
+				LEFT JOIN PurchaseOrderPayment on PurchaseOrder.PurchaseOrderID = PurchaseOrderPayment.PurchaseOrderID
+			WHERE Supplier.SupplierID = @SearchSupplierID or @SearchSupplierID is null
+			GROUP BY PurchaseOrder.PurchaseOrderID,PurchaseOrderDate,CONCAT(FirstName, ' ', LastName),PaymentAmount
+			HAVING SUM(Product.Price * PurchaseOrderDetail.Quantity)-PaymentAmount>0
+            SET @Return = 0
+		COMMIT TRAN
 		END TRY
 		BEGIN CATCH
 			ROLLBACK
@@ -1609,8 +1674,16 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
-			COMMIT TRAN
+				declare @PurchaseOrderID int = 0
+				select @PurchaseOrderID = PurchaseOrderID from PurchaseOrder where PurchaseOrderID = @ReturnPurchaseOrderID
+				IF @PurchaseOrderID <> 0
+			BEGIN
+				insert into PurchaseOrder (SupplierID, PurchaseOrderDate) (select SupplierID, CURRENT_TIMESTAMP from PurchaseOrder where PurchaseOrderID = @ReturnPurchaseOrderID)
+				SELECT @NewPurchaseOrderID = SCOPE_IDENTITY()
+				insert into PurchaseOrderDetail (PurchaseOrderID, ProductID, Quantity) select @NewPurchaseOrderID, ProductID, Quantity * -1 
+				from PurchaseOrderDetail where PurchaseOrderID = @ReturnPurchaseOrderID
+				END
+				ELSE set @Return = -1
 		END TRY
 		BEGIN CATCH
 			ROLLBACK
@@ -1818,12 +1891,11 @@ BEGIN
 			BEGIN TRAN
 				
 			COMMIT TRAN
-		END TRY
-		BEGIN CATCH
-			ROLLBACK
-			Set @Return = -1
-		END CATCH
-
+	END TRY
+	BEGIN CATCH
+		ROLLBACK
+		Set @Return = -1
+	END CATCH
 	RETURN @Return
 END
 GO
