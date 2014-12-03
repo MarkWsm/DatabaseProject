@@ -256,10 +256,7 @@ EXEC @Return = GetPaymentList
 SELECT @Return as ReturnValue
 GO
 
---- Product ---
-
-USE TermProject
-GO
+--- Product --- by kostia
 
 -- 1. AddProduct  --
 declare @ProductID int
