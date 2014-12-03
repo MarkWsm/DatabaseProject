@@ -337,46 +337,47 @@ BEGIN
 END
 GO
 
-
---- 
+---
 ---Supplier Requirements
 ---
 CREATE PROCEDURE AddSupplier
 /*
-Procedure Description:	Allows the creation of a Supplier with the all required and optional data
+Procedure Description:	Allows the creation of a supplier with the minimum required data
 Return Value			0 for success
 						-1 for any error
 Dataset Returned		No
-*/	
-	@SupplierName nvarchar(120),--Company name of the Supplier
-	@FirstName nvarchar(25),	--Contact first name for the supplier
-	@LastName nvarchar(50),		--Contact last name for the supplier
-	@StreetNumber int = null,			--Optional
-	@StreetName nvarchar(50) = null,	--Optional
-	@StreetType nvarchar(20) = null,	--Optional, Eg. Crescent, Street, etc
-	@City nvarchar(50) = null,			--Optional
-	@Province nvarchar(50) = null,		--Optional
-	@Country nvarchar(50) = null,		--Optional
-	@PostalCode nvarchar(9) = null,		--Optional, supporting Postal and ZipCodes, including Zip+4 add on codes 
-	@HomeEmail nvarchar(50) = null,		--Optional
-	@WorkEmail nvarchar(50) = null,		--Optional
-	@OtherEmail nvarchar(50) = null,	--Optional
+*/
+	@SupplierName nvarchar(120),	--A screen name for the supplier
+	@FirstName nvarchar(25),
+	@LastName nvarchar(50),
+	@StreetNumber int,				--Optional
+	@StreetName nvarchar(50),		--Optional
+	@StreetType nvarchar(50),		--Optional, Eg. Crescent, Street, etc
+	@City nvarchar(50),				--Optional
+	@Province nvarchar(50),			--Optional
+	@Country nvarchar(50),			--Optional
+	@PostalCode nvarchar(9),		--Optional, supporting Postal and ZipCodes, including Zip+4 add on codes 
+	@HomeEmail nvarchar(50),		--Optional
+	@WorkEmail nvarchar(50),		--Optional
+	@OtherEmail nvarchar(50),		--Optional
 	@SupplierID int  OUTPUT	--An output of the SupplierID created
-
 AS
 BEGIN
 	SET NOCOUNT ON;
 
 	declare @Return int = 0
 	BEGIN TRY
-			BEGIN TRAN
-				
-			COMMIT TRAN
-		END TRY
-		BEGIN CATCH
-			ROLLBACK
-			Set @Return = -1
-		END CATCH
+		BEGIN TRAN
+			Insert Into Supplier(SupplierName, FirstName, LastName, StreetNumber, StreetName, StreetType, City, Province, Country, PostalCode, HomeEmail, WorkEmail, OtherEmail)
+				values (@SupplierName, @FirstName, @LastName, @StreetNumber, @StreetName, @StreetType, @City, @Province, @Country, @PostalCode, @HomeEmail, @WorkEmail, @OtherEmail)
+			SELECT @SupplierID = SCOPE_IDENTITY()
+			set @Return = 0
+		COMMIT TRAN
+	END TRY
+	BEGIN CATCH
+		ROLLBACK
+		Set @Return = -1
+	END CATCH
 
 	RETURN @Return
 END
@@ -385,18 +386,18 @@ GO
 
 CREATE PROCEDURE UpdateSupplier
 /*
-Procedure Description:	Allows an existing Supplier to be updated
+Procedure Description:	Allows an existing supplier to be updated
 Return Value			0 for success
 						-1 for any error
 Dataset Returned		No
-*/	
-	@SupplierID int,			--The Supplier to update
+*/
+	@SupplierID int,			--The supplier to update
 	@SupplierName nvarchar(120),--New value for record
 	@FirstName nvarchar(25),	--New value for record
 	@LastName nvarchar(50),		--New value for record
 	@StreetNumber int,			--New value for record
 	@StreetName nvarchar(50),	--New value for record
-	@StreetType nvarchar(20),	--New value for record
+	@StreetType nvarchar(50),	--New value for record
 	@City nvarchar(50),			--New value for record
 	@Province nvarchar(50),		--New value for record
 	@Country nvarchar(50),		--New value for record
@@ -404,7 +405,6 @@ Dataset Returned		No
 	@HomeEmail nvarchar(50),	--New value for record
 	@WorkEmail nvarchar(50),	--New value for record
 	@OtherEmail nvarchar(50)	--New value for record
-
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -412,7 +412,15 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				update Supplier
+				set SupplierName = @SupplierName, FirstName = @FirstName, LastName = @LastName, StreetNumber = @StreetNumber, StreetName = @StreetName, StreetType = @StreetType, City = @City,
+				Province = @Province, Country = @Country, PostalCode = @PostalCode where SupplierID = @SupplierID;
+
+				update SupplierEmail set Email = @HomeEmail where SupplierID = @SupplierID and EmailType = 'Home';
+				update SupplierEmail set Email = @WorkEmail where SupplierID = @SupplierID and EmailType = 'Work';
+				update SupplierEmail set Email = @OtherEmail where SupplierID = @SupplierID and EmailType = 'Other';
+
+			set @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -427,12 +435,12 @@ GO
 
 CREATE PROCEDURE DeleteSupplier
 /*
-Procedure Description:	Allows an existing Supplier to be deleted if they have no Purchase Orders for them
+Procedure Description:	Allows an existing supplier to be deleted if they have no Invoices for them
 Return Value			0 for success
 						-1 for any error
 Dataset Returned		No
 */	
-	@SupplierID int		--The Supplier to delete
+	@SupplierID int	--The supplier to delete
 
 AS
 BEGIN
@@ -441,7 +449,14 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				declare @count int = 0
+				select @count = count(PurchaseOrderID) from PurchaseOrder where SupplierID = @SupplierID
+				IF @count = 0
+				BEGIN
+					delete from Supplier where SupplierID = @SupplierID;
+					delete from SupplierEmail where SupplierID = @SupplierID;
+				END
+				SET  @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -456,12 +471,12 @@ GO
 
 CREATE PROCEDURE GetSupplierByID
 /*
-Procedure Description:	Allows an existing Supplier data to be retrieved
+Procedure Descriptio:	Allows existing supplier information to be retrieved
 Return Value			0 for success
 						-1 for any error
 Dataset Returned		No
-*/	
-	@SupplierID int,					--The Supplier to retrieve
+*/
+ 	@SupplierID int,					--The supplier to retrieve
 	@SupplierName nvarchar(120)  OUTPUT,--The value for record
 	@FirstName nvarchar(25)  OUTPUT,	--The value for record
 	@LastName nvarchar(50)  OUTPUT,		--The value for record
@@ -482,14 +497,21 @@ BEGIN
 
 	declare @Return int = 0
 	BEGIN TRY
-			BEGIN TRAN
-				
-			COMMIT TRAN
-		END TRY
-		BEGIN CATCH
-			ROLLBACK
-			Set @Return = -1
-		END CATCH
+		BEGIN TRAN
+			select @SupplierName = SupplierName, @FirstName=FirstName, @LastName=LastName, @StreetNumber=StreetNumber, @StreetName=StreetName, @StreetType=StreetType,
+			@City=City, @Province=Province, @Country=Country, @PostalCode=PostalCode
+			from Supplier where SupplierID = @SupplierID
+
+			select @HomeEmail = Email from SupplierEmail where EmailType = 'Home' and SupplierID = @SupplierID
+			select @WorkEmail = Email from SupplierEmail where EmailType = 'Work' and SupplierID = @SupplierID
+			select @OtherEmail = Email from SupplierEmail where EmailType = 'Other' and SupplierID = @SupplierID
+			set @Return = 0
+		COMMIT TRAN
+	END TRY
+	BEGIN CATCH
+		ROLLBACK
+		Set @Return = -1
+	END CATCH
 
 	RETURN @Return
 END
@@ -498,27 +520,36 @@ GO
 
 CREATE PROCEDURE GetSupplierList
 /*
-Procedure Description:	Get a list of Suppliers based on a set of criteria, where all of the search criteria must be satisfied
+Procedure Description:	Get a list of suppliers based on a set of criteria, where all of the search criteria must be satisfied
 Return Value			0 for success
 						-1 for any error
-Dataset Returned		Yes		Returns basic Supplier information in a format to put in a grid
-	SupplierID
-	UserName
-	SupplierName	--A combination of FirstName and LastName with appropriate spaces
-	Address			--A combination of all of the address fields together with appropriate spaces and commas, including:
-						StreetNumber
-						StreetName
-						StreetType
-						City
-						Province
-						Country
-						PostalCode
- */	
-	@SearchSupplierName nvarchar(25),	--Search criteria, parameter default should be NULL or empty string
-	@SearchCity nvarchar(50),			--Search criteria, parameter default should be NULL or empty string
-	@SearchProvince nvarchar(50),		--Search criteria, parameter default should be NULL or empty string
-	@SearchCountry nvarchar(50)			--Search criteria, parameter default should be NULL or empty string
---HINT: see hint for GetCustomerList
+Dataset Returned		Yes		Returns basic supplier information in a format to put in a grid
+	SupplierID	
+	SupplierName
+	ContactName	    A combination of FirstName and LastName with appropriate spaces
+	Address			A combination of all of the address fields together with appropriate 
+					spaces and commas, including:
+					StreetNumber
+					StreetName
+					StreetType
+					City
+					Province
+					Country
+					PostalCode
+*/	
+	@SearchSupplierName nvarchar(25) = null,--Search criteria, parameter default should be NULL or empty string
+	@SearchCity nvarchar(50) = null,		--Search criteria, parameter default should be NULL or empty string
+	@SearchProvince nvarchar(50) = null,	--Search criteria, parameter default should be NULL or empty string
+	@SearchCountry nvarchar(50) = null	    --Search criteria, parameter default should be NULL or empty string
+
+/* HINT:for the WHERE condition you will want something like the following that checks the optional to see if they are filled in:
+WHERE (@SearchFirstName is null or FirstName like ??+ @SearchFirstName + ??, --
+	@AND (@SearchLastName is null or LastName like ??+ @SearchLastName + ??, --
+	@AND ?
+This assumes you set the default value for the parameter as @SearchFirstName nvarchar(25), -- = NULL, as well as all the other search criteria.  
+If you use a default of empty string, @FirstName nvarchar(25), -- = 憭, then you will need to modify accordingly.
+*/
+
 
 AS
 BEGIN
@@ -527,7 +558,11 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				select SupplierID, SupplierName, CONCAT(FirstName, ' ', LastName) AS ContactName, CONCAT(StreetNumber, ' ' + StreetName, ' ', StreetType, ', ', City, ', ', Province, ', ', Country, ' ', PostalCode) AS Address from Supplier
+				where (@SearchSupplierName is null or SupplierName like '%' + @SearchSupplierName + '%')
+				and (@SearchCity is null or City like '%' + @SearchCity + '%') and (@SearchProvince is null or Province like '%' + @SearchProvince + '%')
+				and (@SearchCountry is null or Country like '%' + @SearchCountry + '%')
+				set @Return = 0
 			COMMIT TRAN
 		END TRY
 		BEGIN CATCH
@@ -538,6 +573,8 @@ BEGIN
 	RETURN @Return
 END
 GO
+
+
 
 --- 
 ---Product Requirements

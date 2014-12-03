@@ -294,7 +294,7 @@ declare @Return int
 EXEC @Return = DeleteProduct '6'
 SELECT @Return as ReturnValue
 SELECT * FROM Product
-
+GO
 -- 4. GetProductByID --
 
 declare @Return int
@@ -302,7 +302,7 @@ declare @ProductName nvarchar(25)
 declare	@ProductDescription nvarchar(250) 
 declare	@SKU nvarchar(12)
 declare	@Price money
-
+GO
 EXEC @Return = GetProductByID 
 	7,
 	@ProductName OUTPUT,
