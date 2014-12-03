@@ -1926,7 +1926,17 @@ BEGIN
 	declare @Return int = 0
 	BEGIN TRY
 			BEGIN TRAN
-				
+				delete from CustomerEmail
+				delete from PurchaseOrderDetail
+				delete from SupplierEmail
+				delete from InvoiceDetail
+				delete from Product
+				delete from Payment
+				delete from Invoice
+				delete from Customer
+				delete from PurchaseOrder
+				delete from Supplier
+				delete from PurchaseOrderPayment
 			COMMIT TRAN
 	END TRY
 	BEGIN CATCH
