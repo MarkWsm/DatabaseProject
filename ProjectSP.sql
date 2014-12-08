@@ -1284,7 +1284,7 @@ BEGIN
 						on InvoiceDetail.InvoiceID = Invoice.InvoiceID
 						SELECT InvoiceID = @ReturnInvoiceID
 						SET InvoiceDetail.Quantity = InvoiceDetail.Quantity - 1, InvoiceDate												
-						SELECT @NewInvoiceID = = SCOPE_IDENTITY()
+						SELECT @NewInvoiceID = SCOPE_IDENTITY()
 						SET @Return = 0
 					END
 			END 
