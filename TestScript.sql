@@ -338,3 +338,32 @@ declare @Return int
 EXEC @Return = GetProductBackOrderList
 select @Return as ReturnValue, * FROM Product WHERE QuantityOnHand < 0
 GO
+
+--AddPurchaseOrder
+declare @PurchaseOrderID int
+declare @Return int
+EXEC @Return = AddPurchaseOrder
+	"2014-01-01",
+	0, 			
+	@PurchaseOrderID OUTPUT
+SELECT @Return as ReturnValue,@PurchaseOrderID as PurchaseOrderID
+GO
+
+SELECT * from PurchaseOrder
+
+--UpdatePurchaseOrder
+declare @Return int
+EXEC @Return = UpdatePurchaseOrder 
+	000000000,	--PurchaseOrderID int	The ID of the PurchaseOrder to edit
+	"2014-1-1", 	--PurchaseOrderDate datetime
+	12345679	--PurchaseOrderID int
+SELECT @Return as ReturnValue,* from PurchaseOrder
+GO
+
+--DeletePurchaseOrder
+declare @Return int
+EXEC @Return = DeletePurchaseOrder 
+	000000000 	--PurchaseOrderID int The ID of the PurchaseOrder to dedete
+SELECT @RETURN as ReturnValue
+GO
+
